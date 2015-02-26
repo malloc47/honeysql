@@ -154,13 +154,12 @@
                                   :expand "WITH QUERY EXPANSION")))))
        ")"))
 
-(def clause-order
-  "Determines the order that clauses will be placed within generated SQL"
-  [:select :insert-into :update :delete-from :columns :set :from :join
-   :left-join :right-join :where :group-by :having :order-by :limit :offset
-   :values :query-values])
-
-(def known-clauses (set clause-order))
+(defonce clause-order
+  (atom
+   [[1 :select] [1 :insert-into] [1 :update] [1 :delete-from] [2 :columns]
+    [3 :set] [4 :from] [5 :join] [5 :left-join] [5 :right-join] [6 :where]
+    [7 :group-by] [8 :having] [9 :order-by] [10 :limit] [11 :offset]
+    [12 :values] [13 :query-values]]))
 
 (defn format
   "Takes a SQL map and optional input parameters and returns a vector
@@ -246,9 +245,11 @@
   SqlRaw
   (-to-sql [x] (.s x))
   clojure.lang.IPersistentMap
-  (-to-sql [x] (let [clause-ops (concat
-                                 (filter #(contains? x %) clause-order)
-                                 (remove known-clauses (keys x)))
+  (-to-sql [x] (let [possible-clauses (map second
+                                           (sort-by first @clause-order))
+                     clause-ops (concat
+                                 (filter #(contains? x %) possible-clauses)
+                                 (remove (set possible-clauses) (keys x)))
                      sql-str (binding [*subquery?* true
                                        *fn-context?* false]
                                (space-join
